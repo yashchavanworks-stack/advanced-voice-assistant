@@ -1,11 +1,8 @@
 import os
-import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from livekit import api
 from dotenv import load_dotenv
-from livekit import agents, api
-from livekit.agents import llm
-from livekit.plugins import openai
 import uvicorn
 
 load_dotenv()
@@ -20,45 +17,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def health():
+    return {"status": "ok", "service": "token-server"}
+
 @app.get("/token")
 def get_token():
-    api_key = os.getenv("LIVEKIT_API_KEY")
-    api_secret = os.getenv("LIVEKIT_API_SECRET")
-    
-    token = api.AccessToken(api_key, api_secret)\
-        .with_identity("web_user")\
-        .with_grants(api.VideoGrants(room_join=True, room="dev-room"))
-    
-    return {"token": token.to_jwt()}
+    api_key = os.getenv("APIvuD6JXMjQGUc")
+    api_secret = os.getenv("k8X5Ccfy0TiskonQEZXLrwOiP2AM9PlLcsqL4rXGwFY")
+    livekit_url = os.getenv("wss://voice-assistant-psxcd808.livekit.cloud")
 
-async def entrypoint(ctx: agents.JobContext):
-    await ctx.connect()
-    
-    initial_chat_ctx = llm.ChatContext().append(
-        role="system",
-        text="You are a highly advanced web voice assistant. Keep your answers concise, natural, and conversational.",
+    token = (
+        api.AccessToken(api_key, api_secret)
+        .with_identity("web-user")
+        .with_name("User")
+        .with_grants(api.VideoGrants(
+            room_join=True,
+            room="dev-room",
+            can_publish=True,
+            can_subscribe=True,
+        ))
     )
 
-    assistant = agents.pipeline.VoicePipelineAgent(
-        vad=openai.VAD.load(),
-        stt=openai.STT(),
-        llm=openai.LLM(),
-        tts=openai.TTS(),
-        chat_ctx=initial_chat_ctx,
-    )
-
-    assistant.start(ctx.room)
-    await assistant.say("Hello! Welcome to the live website assistant. How can I help you?", allow_interruptions=True)
-
-def start_worker():
-    import threading
-    loop = asyncio.new_event_loop()
-    threading.Thread(target=loop.run_forever, daemon=True).start()
-    asyncio.run_coroutine_threadsafe(
-        agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint)), 
-        loop
-    )
+    return {
+        "token": token.to_jwt()
+    }
 
 if __name__ == "__main__":
-    start_worker()
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    port = int(os.getenv("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
